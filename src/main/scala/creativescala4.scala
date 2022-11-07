@@ -6,6 +6,7 @@ import doodle.java2d._
 import doodle.algebra.Size
 
 import doodle.core.PathElement._
+import Point._
 
 object Chapter4 {
     val image = Image.circle(100).fillColor(Color.paleGoldenrod).strokeColor(Color.indianRed)
@@ -408,5 +409,185 @@ object Chapter10 {
             case 0 => Nil
             case n => element :: fill(n - 1, element)
         }
+    }
+
+    def double(input: List[Int]): List[Int] = {
+        input match {
+            case Nil => Nil
+            case head :: tail => 2 * head :: double(tail)
+        }
+    }
+
+    def product(input: List[Int]): Int = {
+        input match {
+            case Nil => 1
+            case head :: tail => head * product(tail)
+        }
+    }
+
+    // whether list contains a particular element
+    def contains[A](input: List[A], check: A): Boolean = {
+        input match {
+            case Nil => false
+            case head :: tail => (head == check) || contains(tail, check)
+        }
+    }
+
+    // first item in list, otherwise if empty then return the element
+    def firstOrThis[A](list: List[A], element: A): A = {
+        list match {
+            case Nil => element
+            case head :: tail => head
+        }
+    }
+
+    def reverse[A](list: List[A]): List[A] = {
+        def iterate[A](remaining: List[A], reversed: List[A]): List[A] = {
+            remaining match {
+                case Nil => reversed
+                case element :: tail => iterate(tail, element :: reversed)
+            }
+        }
+        iterate(list, Nil)
+    }
+
+    // colored polygons exercise
+
+    def polygon(sides: Int, size: Int, initialRotation: Angle): Image = {
+        def iter(n: Int, rotation: Angle): List[PathElement] =
+            n match {
+                case 0 => Nil
+                case n =>
+                    LineTo(polar(size, rotation * n + initialRotation)) :: iter(n-1, rotation)
+            }
+        Image.closedPath(moveTo(polar(size, initialRotation)) :: iter(sides, Angle.turns(1.0) / sides))
+    }
+
+    def styleVioletRed(img: Image): Image = {
+        img
+            .strokeWidth(3.0)
+            .strokeColor(Color.mediumVioletRed)
+            .fillColor(Color.paleVioletRed.fadeOut(0.5.normalized))
+    }
+
+    def makeShape(n: Int, sizeIncrement: Int): Image =
+        polygon(sides = n+2, size = n*sizeIncrement, initialRotation = 0.degrees)
+
+    def makeColor(n: Int, spinIncrement: Angle, start: Color): Color =
+        start.spin(angle = spinIncrement * n)
+
+    val baseColor = Color.hsl(0.degrees, 0.7, 0.7)
+
+    // run using e.g. makeIncrementalImage(15)
+    def makeIncrementalImage(n: Int): Image = {
+        n match {
+            case 0 => Image.empty
+            case n =>
+                val shape = makeShape(n, sizeIncrement = 10)
+                val color = makeColor(n, spinIncrement = 30.degrees, baseColor)
+                makeIncrementalImage(n-1).on(shape.fillColor(color))
+        }
+    }
+
+    // transforming sequences
+    // "to" is inclusive, "until" is non-inclusive
+
+    def incrementUsingMap(list: List[Int]): List[Int] =
+        list.map(x => x + 1)
+
+    def onesUsingMap(n: Int): List[Int] = {
+        (0 until n by 1).map(x => 1).toList
+    }
+
+    def descendingUsingMap(n: Int): List[Int] = {
+        n match {
+            case 0 => Nil
+            case m => (0 until m).toList.map(a => m - a)
+
+        }
+        // also works using (n until 0 by -1).toList
+    }
+
+    def ascendingUsingMap(n: Int): List[Int] = {
+        n match {
+            case 0 => Nil
+            case m => (1 to n).toList
+        }
+    }
+
+    def doubleUsingMap(list: List[Int]): List[Int] = {
+        list.map(x => x * 2)
+    }
+
+    def polygonUsingMap(sides: Int, size: Int, initialRotation: Angle): Image = {
+        val rotation = Angle.turns(1) / sides
+
+        Image.closedPath(
+            moveTo(polar(size, initialRotation)) 
+            :: (1 to sides).toList.map(
+                vertex => lineTo(
+                    polar(size, rotation * vertex + initialRotation))
+            )
+        )
+    }
+
+    def ascendingOpenInterval(n: Int): List[Int] = {
+        // empty range 1 to 0 becomes an empty list
+        (1 to n).toList
+    }
+
+    def star(p: Int, n: Int, radius: Double): Image = {
+        val rotation = Angle.turns(1) / p
+
+        Image.closedPath(
+            moveTo(polar(radius, 0.degrees))
+            :: (1 to p).toList.map(
+                vertex => lineTo(
+                    polar(radius, rotation * vertex * n)
+                )
+            )
+        )
+    }
+
+    def starSolution(sides: Int, skip: Int, radius: Double): Image = {
+        val rotation = Angle.turns(1) * skip / sides
+
+        val start = moveTo(polar(radius, 0.degrees))
+        val elements = (1 until sides).toList.map(
+                vertex => lineTo(
+                    polar(radius, rotation * vertex)
+                )
+            )
+
+        Image.closedPath(start :: elements) strokeWidth(2)
+    }
+
+    // allBeside((1 to 5).toList.map{skip => star(11, skip, 100)})
+    def allBeside(images: List[Image]): Image = {
+        def iter(toDo: List[Image]): Image = {
+            toDo match {
+                case Nil => Image.empty
+                case head :: tail => head beside iter(tail)
+            }
+        }
+        iter(images)
+    }
+
+    def allAbove(images: List[Image]): Image = {
+        images match {
+            case Nil => Image.empty
+            case head :: tail => head above allAbove(tail)
+        }
+    }
+
+    def pyramidOfStars(rows: Int, startingColor: Color = Color.green, spinAngle: Angle = 20.degrees): Image = {
+        allAbove((1 to rows).toList.map{
+            row => allBeside((1 to row).toList.map{
+                skip => 
+                    star(row*2+1, skip, 20)
+                        .noStroke
+                        .fillColor(startingColor.spin(spinAngle*(row+skip)))
+            })
+        })
     }
 }
