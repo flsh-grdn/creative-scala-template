@@ -1,12 +1,17 @@
 import doodle.core._
+import doodle.core.PathElement._
+import Point._
 import doodle.image._
+import doodle.image.syntax._
 import doodle.image.syntax.all._
 import doodle.image.syntax.core._
 import doodle.java2d._
 import doodle.algebra.Size
+import doodle.interact.syntax._
+import doodle.reactor._
 
-import doodle.core.PathElement._
-import Point._
+import doodle.turtle._
+import doodle.turtle.Instruction._
 
 object Chapter4 {
     val image = Image.circle(100).fillColor(Color.paleGoldenrod).strokeColor(Color.indianRed)
@@ -590,4 +595,139 @@ object Chapter10 {
             })
         })
     }
+}
+
+object Chapter11 {
+
+    val standardBlackFrame = Frame.fitToPicture().background(Color.black)
+    
+    def translatePoint(x_translation: Double, y_translation: Double): Point => Point = {
+        (point: Point) => Point(point.x + x_translation, point.y + y_translation)
+    }
+
+    def rotatePoint(angle: Angle): Point => Point = {
+        (point: Point) => point.rotate(angle)
+    }
+
+    def roseRotate(k: Int, angle: Angle): Point => Point = {
+        (point: Point) => Point((point.angle * k).cos*50 + point.r, point.angle + angle)
+    }
+
+    // Chapter11.travellingCircle.run(Frame.size(600,600))
+    val travellingCircle =
+        Reactor.init(Point(-300, 0))
+            .withOnTick(translatePoint(3, 0))
+            .withRender(pt => Image.circle(10).at(pt))
+            .withStop(pt => pt.x >= 300)
+    
+    // Chapter11.orbitingCircle.run(Frame.size(600,600))
+    val orbitingCircle =
+        Reactor.init(Point(0, 300))
+            .withOnTick(roseRotate(k = 7, 3.degrees))
+            .withRender(pt => Image.circle(10).at(pt))
+
+    val bubble =
+        Reactor.linearRamp(0, 200)
+            .withRender(r => Image.circle(r))
+    
+}
+
+object Chapter12 {
+
+    // Turtle.draw(Chapter12.squareUsingTurtle).draw()
+    val squareUsingTurtle: List[Instruction] =
+        List(
+            forward(10), turn(90.degrees),
+            forward(10), turn(90.degrees),
+            forward(10), turn(90.degrees),
+            forward(10)
+        )
+
+    def polygonUsingTurtle(sides: Int, sideLength: Double): Image =
+        val turnAngle = Angle.turns(1) / sides  // or could use Angle.one / sides
+
+        def iter(n: Int): List[Instruction] =
+            n match {
+                case 0 => Nil
+                case n => List(forward(sideLength), turn(turnAngle)) ::: iter(n-1)
+                // or could use ele :: ele :: iter
+            }
+        Turtle.draw(iter(sides))
+
+    def squareSpiral(iterations: Int, lengthIncrease: Double = 1.02, angleIncrease: Angle = 1.degrees): Image = {
+        val initialLength = 5.0
+        
+        def iter(n: Int): List[Instruction] =
+            n match {
+                case 0 => Nil
+                case n => forward(initialLength + n * lengthIncrease) :: turn(90.degrees + angleIncrease) :: iter(n-1)
+            }
+
+        Turtle.draw(iter(iterations))
+    }
+
+    // Chapter12.squareSpiralSolution(50,5.0,88.degrees,3.0).draw()
+    def squareSpiralSolution(steps: Int, 
+        distance: Double = 5.0, 
+        angle: Angle = 88.degrees, 
+        increment: Double = 1.0): Image = {
+
+        def iter(n: Int, distance: Double): List[Instruction] = {
+            n match {
+                case 0 => Nil
+                case n => forward(distance) :: turn(angle) :: iter(n-1, distance + increment)
+            }
+        }
+
+        Turtle.draw(iter(steps, distance))
+    }
+
+    val branchExample = Turtle.draw(List(
+        forward(100),
+        branch(turn(45.degrees), forward(100)),
+        branch(turn(-45.degrees), forward(100))
+    ))
+
+    def doubleUsingFlatMap[A](list: List[A]): List[A] = {
+        list.flatMap(ele => List(ele, ele))
+    }
+
+    def nothing[A](input: List[A]): List[A] = {
+        // List.empty[A]
+        input.flatMap(input => List.empty)
+    }
+
+    def rewrite(instructions: List[Instruction], 
+            rule: Instruction => List[Instruction]
+        ): List[Instruction] = {
+        instructions.flatMap(
+            instruction => instruction match {
+                case Branch(instruction) => List(branch(rewrite(instruction, rule):_*))
+                case other => rule(other)
+            })
+    }
+
+    def iterate(steps: Int, 
+        seed: List[Instruction], 
+        rule: Instruction => List[Instruction]
+        ): List[Instruction] = {
+    
+        steps match {
+            case 0 => seed
+            case n => iterate(n-1, rewrite(seed, rule), rule)
+        }
+
+    }
+
+    // (Turtle.draw(Chapter12.iterate(1, List(forward(10), noop), Chapter12.simpleLSystemBranch)) beside Turtle.draw(Chapter12.iterate(2, List(forward(10), noop), Chapter12.simpleLSystemBranch)) beside Turtle.draw(Chapt r12.iterate(3, List(forward(10), noop), Chapter12.simpleLSystemBranch))).draw()
+    def simpleLSystemBranch(instruction: Instruction): List[Instruction] =
+        val stepSize = 10
+        
+        instruction match { 
+            case Forward(_) => List(forward(stepSize), forward(stepSize))
+            case NoOp =>
+                List(branch(turn(45.degrees), forward(stepSize), noop), 
+                branch(turn(-45.degrees), forward(stepSize), noop))
+            case other => List(other)
+        }
 }
