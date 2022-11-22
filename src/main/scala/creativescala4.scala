@@ -13,6 +13,10 @@ import doodle.reactor._
 import doodle.turtle._
 import doodle.turtle.Instruction._
 
+import doodle.random._
+
+val blackFrame = Frame.fitToPicture(border = 20).background(Color.black)
+
 object Chapter4 {
     val image = Image.circle(100).fillColor(Color.paleGoldenrod).strokeColor(Color.indianRed)
 
@@ -729,5 +733,96 @@ object Chapter12 {
                 List(branch(turn(45.degrees), forward(stepSize), noop), 
                 branch(turn(-45.degrees), forward(stepSize), noop))
             case other => List(other)
+        }
+
+    // Turtle.draw(Chapter12.iterate(5, List(forward(300)), Chapter12.kochCurve)).draw()
+    def kochCurve(instruction: Instruction): List[Instruction] =
+
+        // use subdivision of any straight lines into the more complex shape
+
+        instruction match {
+            case Forward(a) => List(
+                forward(a/3), turn(45.degrees), 
+                forward(a/3), turn(-90.degrees), 
+                forward(a/3), turn(45.degrees), 
+                forward(a/3))
+            case other => List(other)
+        }
+
+    def polygonUsingTurtleAndFlatMap(sides: Int, sideLength: Double): Image =
+        val turnAngle = Angle.one / sides
+
+        Turtle.draw(
+            (0 until sides).toList.flatMap(i => List(turn(turnAngle), forward(sideLength)))
+        )
+
+    def squareSpiralUsingTurtle(steps: Int, distance: Double, 
+        angle: Angle, increment: Double): Image =
+
+        Turtle.draw(
+        (0 until steps).toList.flatMap(step => List(
+            forward(distance+(step * increment)), 
+            turn(angle)))
+        )
+
+    def randomCircle(radius: Double, color: Random[Color]): Random[Image] = {
+        color.map(fill => Image.circle(radius).fillColor(fill))
+    }
+
+}
+
+object Chapter13 {
+    // suspended random - does not generate the random number until the run method is called
+    val randomDouble = Random.double
+
+    // Chapter13.randomAngle.run
+    val randomAngle: Random[Angle] =
+        Random.double.map(x => x.turns)
+
+    def randomColor(saturation: Double, lightness: Double): Random[Color] =
+        randomAngle.map(hue => Color.hsl(hue, saturation, lightness))
+
+    def concentricCircles(count: Int, size: Int, color: Color): Image =
+        count match {
+            case 0 => Image.empty
+            case n =>
+                Image.circle(size).fillColor(color).on(concentricCircles(n-1, size+5, color.spin(15.degrees)))
+        }
+
+    def randomConcentricCircles(count: Int, size: Int): Random[Image] =
+        count match {
+            case 0 => Random.always(Image.empty)
+            case n =>
+                val randomPastel = randomColor(0.7, 0.7)
+                Chapter12.randomCircle(size, randomPastel).flatMap( circle =>
+                    randomConcentricCircles(n-1, size + 5).map( circles =>
+                        circle.on(circles)))
+        }
+
+    def randomRectangle(width: Double, height: Double, color: Random[Color]): Random[Image] =
+        color.map(fillColor => Image.rectangle(width, height).fillColor(fillColor))
+
+    // Chapter13.rowOfRandomBoxes(20, 20, 5).run.draw()
+    def rowOfRandomBoxes(width: Double, height: Double, count: Int): Random[Image] =
+        count match {
+            case 0 => Random.always(Image.empty)
+            case n =>
+                val randomPastel = randomColor(0.7, 0.7)
+                randomRectangle(width, height, randomPastel).flatMap(rectangle =>
+                    rowOfRandomBoxes(width, height, n-1).map(rectangles => rectangle beside rectangles))
+        }
+
+    // solution
+    def coloredRectangle(color: Color): Image =
+        Image.rectangle(20, 20).fillColor(color)
+
+    // Chapter13.randomColorBoxes(5).run.draw()
+    def randomColorBoxes(count: Int): Random[Image] =
+        count match {
+            case 0 => randomColor(0.7, 0.7).map( c => coloredRectangle(c))
+            case n =>
+                val thisBox = randomColor(0.7, 0.7).map{ c => coloredRectangle(c) }
+                val otherBoxes = randomColorBoxes(n-1)
+                thisBox.flatMap{ thisBoxI => otherBoxes.map{ otherBoxesI => thisBoxI beside otherBoxesI }}
         }
 }
