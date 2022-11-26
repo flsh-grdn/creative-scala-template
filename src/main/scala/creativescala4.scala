@@ -825,4 +825,76 @@ object Chapter13 {
                 val otherBoxes = randomColorBoxes(n-1)
                 thisBox.flatMap{ thisBoxI => otherBoxes.map{ otherBoxesI => thisBoxI beside otherBoxesI }}
         }
+
+    // structured randomness
+    def coloredRectangle(color: Color, size: Int): Image =
+        Image.rectangle(size, size)
+            .strokeWidth(5.0).strokeColor(color.spin(30.degrees))
+            .fillColor(color)
+
+    // generate random color using normal distribution, with mean and std
+    def nextColor(color: Color): Random[Color] =
+        val spin = Random.normal(15.0, 10.0)
+        spin.map{ s => color.spin(s.degrees) }
+
+    // Chapter13.randomGradientBoxes(10, Color.blue).run.draw()
+    def randomGradientBoxes(count: Int, color: Color): Random[Image] =
+        count match {
+            case 0 => Random.always(Image.empty)
+            case n =>
+                val box = coloredRectangle(color, 20)
+                val boxes = nextColor(color).flatMap{ c => randomGradientBoxes( n-1, c) }
+                boxes.map{ b => box beside b }
+        }
+
+    // particle systems
+    val start = Random.always(Point.zero)
+
+    def step(current: Point): Random[Point] =
+        val drift = Point(current.x + 10, current.y)
+        val noise =
+            Random.normal(0.0, 5.0) flatMap { 
+                x => Random.normal(0.0, 5.0) map { 
+                    y => Vec(x, y)
+                }
+            }
+
+        noise.map(vec => drift + vec)
+
+    def render(point: Point): Image =
+        Image.circle(5.0).at(point)
+
+    def walk(start: Random[Point], steps: Int, render: Point => Image): Random[Image] =
+        def loop(count: Int, current: Point, image: Image): Random[Image] = {
+            count match {
+                case 0 => Random.always(image on render(current))
+                case n =>
+                    val next = step(current)
+                    next.flatMap { pt => loop(count - 1, pt, image on render(current)) }
+            }
+        }
+
+        start.flatMap { pt => loop(steps, pt, Image.empty) }
+
+    def particleSystem(
+        particles: Int, 
+        render: Point => Image, 
+        start: Random[Point], 
+        walk: (Random[Point], Int, Point => Image) => Random[Image], 
+        steps: Int
+    ): Random[Image] = {
+        def loop(count: Int): Random[Image] = {
+            count match {
+                case 0 => Random.always(Image.empty)
+                case n =>
+                    walk(start, steps, render).flatMap(img => loop(count - 1).map(others => img on others))
+            }
+        }
+
+        loop(particles)
+    }
+
+    // For comprehension
+
+    
 }
